@@ -10,18 +10,18 @@ import type { MyUIMessage } from "../server/router";
 const transport = new TrpcChatTransport();
 
 export function Chat() {
-  const [chatId, setChatId] = useState(() => getUrlParam(`chatId`) || generateId(`chat`));
+  const [chatId, setChatId] = useState(() => getUrlParam(`chatId`) || setUrlParam(`chatId`, generateId(`chat`)));
   const [input, setInput] = useState(``);
   const [isLoading, setLoading] = useState(true);
 
   const { messages, setMessages, sendMessage, status, error, resumeStream } = useChat<MyUIMessage>({
-      id: chatId,
-      transport,
-      generateId: () => generateId(`msg`),
-      onError: (err) => {
-        console.error(`[Chat] Error:`, err);
-      },
-    });
+    id: chatId,
+    transport,
+    generateId: () => generateId(`msg`),
+    onError: (err) => {
+      console.error(`[Chat] Error:`, err);
+    },
+  });
 
   const isSending = status === `streaming` || status === `submitted`;
 
@@ -83,7 +83,14 @@ export function Chat() {
         </p>
       </div>
 
-      <div style={{ marginBottom: `16px`, display: `flex`, justifyContent: `space-between`, alignItems: `flex-start` }}>
+      <div
+        style={{
+          marginBottom: `16px`,
+          display: `flex`,
+          justifyContent: `space-between`,
+          alignItems: `flex-start`,
+        }}
+      >
         <div>
           <small>Chat ID: {chatId}</small>
           <br />

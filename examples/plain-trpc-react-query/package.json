@@ -1,0 +1,9 @@
+{
+  "name": "plain-trpc-react-query",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:server": "tsx watch ./src/server/index.ts",
+    "dev:client": "vite"
+  }
+}

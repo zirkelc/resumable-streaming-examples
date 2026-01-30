@@ -9,8 +9,10 @@ export function getUrlParam(key: string): string | null {
   return params.get(key);
 }
 
-export function setUrlParam(key: string, value: string) {
+export function setUrlParam(key: string, value: string): string {
   const params = new URLSearchParams(window.location.search);
   params.set(key, value);
   window.location.search = params.toString();
+
+  return value;
 }

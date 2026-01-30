@@ -9,6 +9,7 @@ export async function getStreamContext() {
   if (!streamContext) {
     const { host, port } = await startRedis();
     const redisUrl = `redis://${host}:${port}`;
+    // const redisUrl = `rediss://default:AWw-AAIncDExOGIwMjgxODc0ZTI0OTk4OWYwY2VkYzMzMWE5ZTQxMXAxMjc3MTA@sought-ibex-27710.upstash.io:6379`;
 
     /** Create separate publisher and subscriber clients */
     const publisher = createClient({ url: redisUrl });
@@ -20,12 +21,7 @@ export async function getStreamContext() {
     console.log(`[stream-context] Redis clients connected to ${redisUrl}`);
 
     streamContext = createResumableStreamContext({
-      /** Fire-and-forget background task handler */
-      waitUntil: async (promise) => {
-        promise.catch((error) => {
-          console.error(`[stream-context] Background task error:`, error);
-        });
-      },
+      waitUntil: null,
       publisher,
       subscriber,
     });

@@ -1,9 +1,0 @@
-{
-  "name": "ai-sdk-trpc",
-  "private": true,
-  "type": "module",
-  "scripts": {
-    "dev:server": "tsx watch server/index.ts",
-    "dev:client": "vite"
-  }
-}

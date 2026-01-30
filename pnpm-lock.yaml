@@ -90,9 +90,9 @@ importers:
 
   src/examples/ai-sdk-trpc: {}
 
-  src/examples/plain-trpc-react-query: {}
+  src/examples/ai-sdk-trpc-react-query: {}
 
-  src/examples/trpc-streaming: {}
+  src/examples/plain-trpc-react-query: {}
 
 packages:
 

@@ -1,0 +1,9 @@
+{
+  "name": "ai-sdk-trpc-react-query",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:server": "tsx watch ../ai-sdk-trpc/src/server/index.ts",
+    "dev:client": "vite"
+  }
+}

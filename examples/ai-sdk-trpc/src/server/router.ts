@@ -15,11 +15,14 @@ import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { generateId } from "../../../shared/utils";
 import { publicProcedure, router } from "./trpc";
 import { getStreamContext } from "./stream-context";
-import { createAsyncIterableStream } from 'ai-stream-utils/utils';
+import { createAsyncIterableStream } from "ai-stream-utils/utils";
 
-type MyMetadata = {  };
+type MyMetadata = {
+  createdAt?: string;
+  finishReason?: string;
+};
 
-type MyDataPart = {  };
+type MyDataPart = {};
 
 type MyTools = InferUITools<{}>;
 
@@ -92,7 +95,7 @@ export const appRouter = router({
         message: z.custom<MyUIMessage>(),
       }),
     )
-    .mutation(async function* ({ input }): AsyncGenerator<InferUIMessageChunk<MyUIMessage>> {
+    .mutation(async function* ({ input }): AsyncGenerator<UIMessageChunk> {
       const { chatId, message } = input;
       console.log(`[sendMessage] chatId=${chatId}, message=${message.id}`);
       const chat = getChat(chatId);
@@ -137,6 +140,20 @@ export const appRouter = router({
       const uiStream = result.toUIMessageStream({
         originalMessages: messages,
         generateMessageId: () => generateId(`msg`),
+        messageMetadata: ({ part }) => {
+          if (part.type === 'start') {
+            return {
+              createdAt: new Date().toISOString(),
+            };
+          }
+
+          // Send additional metadata when streaming completes
+          if (part.type === 'finish') {
+            return {
+              finishReason: part.finishReason,
+            };
+          }
+        },
         onFinish: ({ messages }) => {
           console.log(`[sendMessage] onFinish called`);
           saveChat({ ...chat, messages, activeStreamId: null });
@@ -146,7 +163,7 @@ export const appRouter = router({
       const [trpcStream, redisStream] = uiStream.tee();
       const sseStream = redisStream.pipeThrough(new JsonToSseTransformStream());
 
-      streamContext.createNewResumableStream(activeStreamId, () => sseStream);
+      await streamContext.createNewResumableStream(activeStreamId, () => sseStream);
 
       yield* createAsyncIterableStream(trpcStream);
     }),

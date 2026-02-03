@@ -18,7 +18,7 @@ The resumable streaming is managed by `resumable-stream` and Redis in-memory dat
 
 This example builds on the [AI SDK + tRPC](src/examples/ai-sdk-trpc/) example, but replaces the AI SDK's built-in `useChat` hook with a custom implementation using TanStack React Query for state management. It does not use `@ai-sdk/react` on the client.
 
-## [Resumable Streaming CLI](src/examples/resumable-streaming/)
+### [Resumable Streaming CLI](src/examples/resumable-streaming/)
 
 This example demonstrates resumable streaming with a multiple CLI clients that connect. The first client initiates the stream and prints it to the console. When the second client connects, it automatically resumes from where the first client is and then runs in-sync with teh first client.
 

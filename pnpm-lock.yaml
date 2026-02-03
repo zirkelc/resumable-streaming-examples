@@ -72,6 +72,9 @@ importers:
       '@vitejs/plugin-react':
         specifier: ^4.3.0
         version: 4.7.0(vite@6.4.1(@types/node@25.0.3)(tsx@4.21.0))
+      chalk:
+        specifier: ^5.6.2
+        version: 5.6.2
       oxfmt:
         specifier: ^0.24.0
         version: 0.24.0
@@ -87,12 +90,6 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.1(@types/node@25.0.3)(tsx@4.21.0)
-
-  src/examples/ai-sdk-trpc: {}
-
-  src/examples/ai-sdk-trpc-react-query: {}
-
-  src/examples/plain-trpc-react-query: {}
 
 packages:
 
@@ -910,6 +907,10 @@ packages:
 
   caniuse-lite@1.0.30001762:
     resolution: {integrity: sha512-PxZwGNvH7Ak8WX5iXzoK1KPZttBXNPuaOvI2ZYU7NrlM+d9Ov+TUvlLOBNGzVXAntMSMMlJPd+jY6ovrVjSmUw==}
+
+  chalk@5.6.2:
+    resolution: {integrity: sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA==}
+    engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
 
   chownr@2.0.0:
     resolution: {integrity: sha512-bIomtDF5KGpdogkLd9VspvFzk9KfpyyGlS8YFVZl7TGPBHL5snIOnxeshwVgPteQ9b4Eydl+pVbIyE1DcvCWgQ==}
@@ -2030,6 +2031,8 @@ snapshots:
   camelcase@6.3.0: {}
 
   caniuse-lite@1.0.30001762: {}
+
+  chalk@5.6.2: {}
 
   chownr@2.0.0: {}
 

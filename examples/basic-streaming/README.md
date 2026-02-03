@@ -1,4 +1,4 @@
-# Plain tRPC + React Query
+# Streaming tRPC + React Query
 
 A demo application showcasing **resumable streaming** with tRPC v11, TanStack Query v5, and React 19.
 

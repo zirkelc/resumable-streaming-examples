@@ -14,7 +14,7 @@ import { MockLanguageModelV3 } from "ai/test";
 import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { generateId } from "../../../shared/utils";
 import { publicProcedure, router } from "./trpc";
-import { getStreamContext } from "./stream-context";
+import { createStreamContext } from "../../../shared/stream-context";
 import { createAsyncIterableStream } from "ai-stream-utils/utils";
 
 type MyMetadata = {
@@ -111,7 +111,7 @@ export const appRouter = router({
       const activeStreamId = generateId(`stream`);
       saveChat({ ...chat, messages, activeStreamId });
 
-      const streamContext = await getStreamContext();
+      const streamContext = await createStreamContext();
 
       console.log(`[sendMessage] Starting stream activeStreamId=${activeStreamId}`);
 
@@ -183,7 +183,7 @@ export const appRouter = router({
 
     console.log(`[resumeMessage] Resuming stream ${chat.activeStreamId}`);
 
-    const streamContext = await getStreamContext();
+    const streamContext = await createStreamContext();
     const resumedStream = await streamContext.resumeExistingStream(chat.activeStreamId);
 
     if (resumedStream) {

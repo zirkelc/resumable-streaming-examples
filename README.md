@@ -1,51 +1,26 @@
 # tRPC Streaming Examples
 
-A collection of examples demonstrating **resumable streaming** patterns with tRPC v11.
+A collection of examples demonstrating **streaming** and **resumable streaming** patterns with tRPC, TanStack Query and AI SDK.
 
 ## Examples
 
-### [Plain tRPC + React Query](src/examples/plain-trpc-react-query/)
+### [Basic Streaming](src/examples/basic-streaming/)
 
-Basic resumable streaming with tRPC and TanStack Query.
-
-- In-memory message storage
-- Polling-based resume (compares word counts)
-- Manual interrupt/resume controls
-- Background task persistence via stream tee
+A basic example demonstrating how to use streaming with tRPC and TanStack Query.
 
 ### [AI SDK + tRPC](src/examples/ai-sdk-trpc/)
 
-Advanced streaming with Vercel AI SDK integration.
+This example implements resumable streaming with Vercel AI SDK on the server and client. 
+It uses the `useChat` hook from `@ai-sdk/react` and a custom `ChatTransport` implementation to connect with tRPC on the server. 
+The resumable streaming is managed by `resumable-stream` and Redis in-memory database. 
 
-- `@ai-sdk/react` useChat hook with standardized `UIMessage` format
-- Custom `ChatTransport` implementation for tRPC
-- Redis-backed stream persistence via `resumable-stream`
-- SSE serialization for reliable resume
-- Auto-resume on page load
+### [AI SDK + tRPC + React Query](src/examples/ai-sdk-trpc-react-query/)
 
-## Quick Start
+This example builds on the [AI SDK + tRPC](src/examples/ai-sdk-trpc/) example, but replaces the AI SDK's built-in `useChat` hook with a custom implementation using TanStack React Query for state management. It does not use `@ai-sdk/react` on the client.
 
-```bash
-# Install dependencies
-pnpm install
+## [Resumable Streaming CLI](src/examples/resumable-streaming/)
 
-# Run an example (see individual READMEs for details)
-cd src/examples/plain-trpc-react-query
-pnpm dev:server  # Terminal 1
-pnpm dev:client  # Terminal 2
-```
-
-## Project Structure
-
-```
-├── src/
-│   ├── shared/
-│   │   └── utils.ts              # Shared utilities (generateId)
-│   └── examples/
-│       ├── plain-trpc-react-query/  # Plain tRPC + React Query example
-│       └── ai-sdk-trpc/             # AI SDK + tRPC example
-└── package.json
-```
+This example demonstrates resumable streaming with a multiple CLI clients that connect. The first client initiates the stream and prints it to the console. When the second client connects, it automatically resumes from where the first client is and then runs in-sync with teh first client.
 
 ## License
 

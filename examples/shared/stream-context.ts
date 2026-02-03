@@ -2,13 +2,9 @@ import { createResumableStreamContext } from "resumable-stream";
 import { createClient } from "redis";
 import { startRedis } from "./redis";
 
-let streamContext: ReturnType<typeof createResumableStreamContext> | null = null;
-
-/** Get or create the resumable stream context */
-export async function getStreamContext() {
-  if (!streamContext) {
+export async function createStreamContext() {
     const { host, port } = await startRedis();
-    const redisUrl = `redis://${host}:${port}`;
+  const redisUrl = `redis://${host}:${port}`;
 
     /** Create separate publisher and subscriber clients */
     const publisher = createClient({ url: redisUrl });
@@ -17,14 +13,12 @@ export async function getStreamContext() {
     await publisher.connect();
     await subscriber.connect();
 
-    console.log(`[stream-context] Redis clients connected to ${redisUrl}`);
-
-    streamContext = createResumableStreamContext({
+    const streamContext = createResumableStreamContext({
       waitUntil: null,
       publisher,
       subscriber,
     });
-  }
+
 
   return streamContext;
 }

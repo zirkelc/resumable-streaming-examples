@@ -55,6 +55,66 @@ const convertToUIMessageStream = (iterable: AsyncIterable<MyUIChunk>, options?: 
   return stream;
 };
 
+export function useChat2({ chatId }) {
+  const queryClient = useQueryClient();
+  const queryKey = trpc.listMessages.queryKey({ chatId });
+
+  const upsertMessage = (message: UIMessage) => {
+    queryClient.setQueryData(queryKey, (old) => {
+      const messages = [...old?.messages ?? []];
+      const index = messages.findIndex((m) => m.id === message.id);
+
+      if (index >= 0) {
+        messages[index] = message;
+      } else {
+        messages.push(message);
+      }
+
+      return { chatId, messages };
+    });
+  };
+
+  const messagesQuery = useQuery({
+    queryKey,
+    queryFn: () => trpcClient.listMessages.query({ chatId }),
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (text: string) => {
+      const userMessage: UIMessage = {
+        id: generateId(`msg`),
+        role: `user`,
+        parts: [{ type: `text`, text }],
+      };
+
+      // Optimistically add user message                                      
+        upsertMessage(userMessage);
+
+      // Send message to server and stream response
+      const iterable = await trpcClient.sendMessage.mutate({
+        chatId, message: userMessage
+      });
+
+      // Convert async iterable to stream
+      const stream = convertAsyncIterableToStream(iterable);
+
+      // Loop through stream and update message for each chunk
+      for await (const assistMessage of readUIMessageStream({ stream })) {
+        upsertMessage(assistMessage);
+      }
+    },
+    onSuccess: () => {
+      // Sync with server after streaming completes                           
+      queryClient.invalidateQueries({ queryKey });
+    },
+  });
+
+  return {
+    messages: messagesQuery.data?.messages ?? [],
+    sendMessage: (text: string) => sendMessageMutation.mutateAsync(text),
+  };
+}  
+
 export function useChat({
   chatId,
   autoResume,
@@ -89,7 +149,7 @@ export function useChat({
   };
 
   const messagesQuery = useQuery({
-    queryKey,
+    queryKey: queryKey,
     queryFn: () => trpcClient.listMessages.query({ chatId }),
   });
 

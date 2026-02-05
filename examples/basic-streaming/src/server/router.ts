@@ -21,7 +21,7 @@ type StreamChunk = {
 const messages: Array<Message> = [];
 
 const responses = [
-  `This is a very long message that will take a while to stream so we can test the interrupt and resume functionality properly and see if everything works as expected`,
+  `This is a very long message that will take a while to stream so we can test the streaming functionality properly and see if everything works as expected`,
 ];
 
 function completion(): ReadableStream<string> {
@@ -44,27 +44,6 @@ function completion(): ReadableStream<string> {
       controller.close();
     },
   });
-}
-
-function consumeStream(stream: ReadableStream<string>, message: Message): void {
-  (async () => {
-    console.log(`[consumeStream] Starting for message ${message.id}`);
-    try {
-      const reader = stream.getReader();
-      while (true) {
-        const { done, value: word } = await reader.read();
-        if (done) break;
-
-        message.content += (message.content ? ` ` : ``) + word;
-        console.log(`[consumeStream] Word: "${word}", total: "${message.content}"`);
-      }
-      message.status = `done`;
-      console.log(`[consumeStream] Complete for message ${message.id}`);
-    } catch (error) {
-      message.status = `error`;
-      console.error(`[consumeStream] Error for message ${message.id}:`, error);
-    }
-  })();
 }
 
 async function* convertReadableStreamToAsyncIterable(
@@ -92,40 +71,6 @@ async function* convertReadableStreamToAsyncIterable(
     yield { messageId, status: `done`, text: `` };
   } finally {
     reader.releaseLock();
-  }
-}
-
-async function* pollMessage(message: Message, startWordCount: number): AsyncGenerator<StreamChunk> {
-  console.log(`[pollMessage] Starting for message ${message.id}, startWordCount=${startWordCount}`);
-
-  let lastWordCount = startWordCount;
-
-  while (true) {
-    const words = message.content.split(` `).filter(Boolean);
-
-    for (let i = lastWordCount; i < words.length; i++) {
-      console.log(`[pollMessage] Yielding word: "${words[i]}"`);
-      yield {
-        messageId: message.id,
-        status: `streaming`,
-        text: words[i]!,
-      };
-    }
-    lastWordCount = words.length;
-
-    if (message.status === `done`) {
-      console.log(`[pollMessage] Message is done, exiting`);
-      yield { messageId: message.id, status: `done`, text: `` };
-      break;
-    }
-
-    if (message.status === `error`) {
-      console.log(`[pollMessage] Message has error, exiting`);
-      yield { messageId: message.id, status: `error`, text: `` };
-      break;
-    }
-
-    await new Promise((resolve) => setTimeout(resolve, 50));
   }
 }
 
@@ -159,33 +104,16 @@ export const appRouter = router({
     console.log(`[sendMessage] Created assistant message ${assistantMessage.id}`);
 
     const stream = completion();
-    const [stream1, stream2] = stream.tee();
 
-    consumeStream(stream1, assistantMessage);
-
-    yield* convertReadableStreamToAsyncIterable(stream2, assistantMessage.id);
-  }),
-
-  resumeMessage: publicProcedure.input(messageSchema).mutation(async function* ({
-    input,
-  }): AsyncGenerator<StreamChunk> {
-    console.log(`[resumeMessage] Called with id=${input.id}, content="${input.content}"`);
-
-    const message = messages.find((m) => m.id === input.id);
-
-    if (!message) {
-      console.log(`[resumeMessage] Message not found!`);
-      throw new Error(`Message not found`);
+    for await (const chunk of convertReadableStreamToAsyncIterable(stream, assistantMessage.id)) {
+      if (chunk.text) {
+        assistantMessage.content += (assistantMessage.content ? ` ` : ``) + chunk.text;
+      }
+      if (chunk.status === `done`) {
+        assistantMessage.status = `done`;
+      }
+      yield chunk;
     }
-
-    console.log(
-      `[resumeMessage] Server message status: ${message.status}, content: "${message.content}"`,
-    );
-
-    const startWordCount = input.content.split(` `).filter(Boolean).length;
-    console.log(`[resumeMessage] Client has ${startWordCount} words`);
-
-    yield* pollMessage(message, startWordCount);
   }),
 });
 

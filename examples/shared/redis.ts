@@ -4,7 +4,6 @@ let redisServer: RedisMemoryServer | null = null;
 
 /** Start Redis memory server and return connection details */
 export async function startRedis(): Promise<{ host: string; port: number }> {
-
   if (!redisServer) {
     console.log(`[redis] Starting Redis memory server...`);
     redisServer = new RedisMemoryServer();
@@ -17,6 +16,7 @@ export async function startRedis(): Promise<{ host: string; port: number }> {
 
   const host = await redisServer.getHost();
   const port = await redisServer.getPort();
+  process.env.REDIS_URL = `redis://${host}:${port}`;
 
   return { host, port };
 }

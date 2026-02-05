@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { MessageBubble } from "./Message";
 import { trpc, trpcClient, type Message } from "./trpc";
@@ -6,8 +6,6 @@ import { generateId } from "../../../shared/utils";
 
 export function Chat() {
   const [input, setInput] = useState(``);
-  const [isInterrupted, setIsInterrupted] = useState(false);
-  const abortControllerRef = useRef<AbortController | null>(null);
   const queryClientHook = useQueryClient();
 
   const messagesQuery = useQuery(trpc.listMessages.queryOptions());
@@ -16,9 +14,6 @@ export function Chat() {
     mutationKey: trpc.sendMessage.mutationKey(),
     mutationFn: async (content: string) => {
       console.log(`[sendMessage] Starting mutation`);
-
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
 
       const userMessage: Message = {
         id: generateId(`user`),
@@ -33,7 +28,7 @@ export function Chat() {
         userMessage,
       ]);
 
-      const stream = await trpcClient.sendMessage.mutate(userMessage, { signal });
+      const stream = await trpcClient.sendMessage.mutate(userMessage);
 
       const assistantMessage: Message = {
         id: ``,
@@ -43,56 +38,31 @@ export function Chat() {
         status: `streaming`,
       };
 
-      try {
-        for await (const chunk of stream) {
-          if (signal.aborted) {
-            console.log(
-              `[sendMessage] Signal aborted, breaking loop. Current content: "${assistantMessage.content}"`,
-            );
-            break;
+      for await (const chunk of stream) {
+        const { messageId, status, text } = chunk;
+
+        assistantMessage.id = messageId;
+        assistantMessage.status = status;
+        if (text) {
+          assistantMessage.content += (assistantMessage.content ? ` ` : ``) + text;
+        }
+
+        console.log(
+          `[sendMessage] Received chunk: "${text}", total content: "${assistantMessage.content}"`,
+        );
+
+        queryClientHook.setQueryData<Array<Message>>(trpc.listMessages.queryKey(), (old = []) => {
+          const updated = [...old];
+          const existingIndex = updated.findIndex((m) => m.id === messageId);
+
+          if (existingIndex >= 0) {
+            updated.splice(existingIndex, 1, { ...assistantMessage });
+          } else {
+            updated.push({ ...assistantMessage });
           }
 
-          const { messageId, status, text } = chunk;
-
-          assistantMessage.id = messageId;
-          assistantMessage.status = status;
-          if (text) {
-            assistantMessage.content += (assistantMessage.content ? ` ` : ``) + text;
-          }
-
-          console.log(
-            `[sendMessage] Received chunk: "${text}", total content: "${assistantMessage.content}"`,
-          );
-
-          queryClientHook.setQueryData<Array<Message>>(trpc.listMessages.queryKey(), (old = []) => {
-            const updated = [...old];
-            const existingIndex = updated.findIndex((m) => m.id === messageId);
-
-            if (existingIndex >= 0) {
-              updated.splice(existingIndex, 1, { ...assistantMessage });
-            } else {
-              updated.push({ ...assistantMessage });
-            }
-
-            return updated;
-          });
-        }
-      } catch (error) {
-        console.log(`[sendMessage] Error:`, error);
-        if ((error as Error).name === `AbortError`) {
-          console.log(`[sendMessage] AbortError caught, returning partial message`);
-          return assistantMessage;
-        }
-        if (assistantMessage.id) {
-          assistantMessage.status = `error`;
-          queryClientHook.setQueryData<Array<Message>>(trpc.listMessages.queryKey(), (old = []) =>
-            old.map((m) => (m.id === assistantMessage.id ? { ...assistantMessage } : m)),
-          );
-        }
-        throw error;
-      } finally {
-        console.log(`[sendMessage] Finally block, clearing abortControllerRef`);
-        abortControllerRef.current = null;
+          return updated;
+        });
       }
 
       console.log(
@@ -114,110 +84,6 @@ export function Chat() {
     },
   });
 
-  const resumeMessageMutation = useMutation({
-    mutationKey: trpc.resumeMessage.mutationKey(),
-    mutationFn: async (message: Message) => {
-      console.log(
-        `[resumeMessage] Starting mutation for message id=${message.id}, content="${message.content}"`,
-      );
-
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
-
-      setIsInterrupted(false);
-
-      const stream = await trpcClient.resumeMessage.mutate(message, { signal });
-
-      const resumedMessage: Message = { ...message };
-
-      try {
-        for await (const chunk of stream) {
-          if (signal.aborted) {
-            console.log(`[resumeMessage] Signal aborted, breaking loop`);
-            break;
-          }
-
-          const { messageId, status, text } = chunk;
-
-          resumedMessage.id = messageId;
-          resumedMessage.status = status;
-          if (text) {
-            resumedMessage.content += (resumedMessage.content ? ` ` : ``) + text;
-          }
-
-          console.log(
-            `[resumeMessage] Received chunk: "${text}", status: ${status}, total content: "${resumedMessage.content}"`,
-          );
-
-          queryClientHook.setQueryData<Array<Message>>(trpc.listMessages.queryKey(), (old = []) => {
-            const updated = [...old];
-            const existingIndex = updated.findIndex((m) => m.id === messageId);
-
-            if (existingIndex >= 0) {
-              updated.splice(existingIndex, 1, { ...resumedMessage });
-            }
-
-            return updated;
-          });
-
-          if (status === `done`) {
-            console.log(`[resumeMessage] Status is done, breaking loop`);
-            break;
-          }
-        }
-      } catch (error) {
-        console.log(`[resumeMessage] Error:`, error);
-        if ((error as Error).name === `AbortError`) {
-          console.log(`[resumeMessage] AbortError caught, returning partial message`);
-          return resumedMessage;
-        }
-        throw error;
-      } finally {
-        console.log(`[resumeMessage] Finally block, clearing abortControllerRef`);
-        abortControllerRef.current = null;
-      }
-
-      console.log(
-        `[resumeMessage] Mutation complete, returning message with content: "${resumedMessage.content}"`,
-      );
-      return resumedMessage;
-    },
-    onSuccess: (data) => {
-      console.log(`[resumeMessage] onSuccess called, message content: "${data.content}"`);
-      queryClientHook.invalidateQueries({ queryKey: trpc.listMessages.queryKey() });
-    },
-  });
-
-  const interruptStream = () => {
-    console.log(
-      `[interruptStream] Called, abortControllerRef.current:`,
-      !!abortControllerRef.current,
-    );
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setIsInterrupted(true);
-      console.log(`[interruptStream] Aborted and set isInterrupted=true`);
-    }
-  };
-
-  useEffect(() => {
-    const streamingMessage = messagesQuery.data?.find((m) => m.status === `streaming`);
-
-    if (
-      streamingMessage &&
-      !resumeMessageMutation.isPending &&
-      !isInterrupted &&
-      !sendMessageMutation.isPending
-    ) {
-      resumeMessageMutation.mutate(streamingMessage);
-    }
-  }, [
-    messagesQuery.data,
-    resumeMessageMutation.isPending,
-    isInterrupted,
-    sendMessageMutation.isPending,
-  ]);
-
   const submitMessage = () => {
     if (!input.trim() || sendMessageMutation.isPending) return;
     sendMessageMutation.mutate(input, {});
@@ -229,8 +95,7 @@ export function Chat() {
   };
 
   const messages = messagesQuery.data ?? [];
-  const streamingMessage = messages.find((m) => m.status === `streaming`);
-  const isStreaming = sendMessageMutation.isPending || resumeMessageMutation.isPending;
+  const isStreaming = sendMessageMutation.isPending;
 
   return (
     <div>
@@ -252,13 +117,6 @@ export function Chat() {
         <button onClick={clearMessages} disabled={messages.length === 0 || isStreaming}>
           Clear
         </button>
-        {isStreaming && <button onClick={interruptStream}>Interrupt</button>}
-        {isInterrupted && streamingMessage && (
-          <button onClick={() => resumeMessageMutation.mutate(streamingMessage)}>Resume</button>
-        )}
-        {resumeMessageMutation.isPending && (
-          <span style={{ marginLeft: `8px`, color: `#666` }}>Resuming...</span>
-        )}
       </div>
 
       <div>

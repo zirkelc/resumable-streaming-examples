@@ -14,7 +14,6 @@ export function MessageBubble({ content, role, status }: MessageBubbleProps) {
     <div>
       <strong>{prefix}</strong>
       {content}
-      {status === `streaming` ? ` ...` : null}
       {status === `error` ? ` [Error]` : null}
     </div>
   );

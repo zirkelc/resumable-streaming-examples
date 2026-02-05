@@ -88,18 +88,6 @@ useEffect(() => {
 
 The server handles stream state, that means if no active stream exists, the resume call returns empty and completes immediately.
 
-## Project Structure
-
-```
-src/client/
-├── App.tsx           # QueryClientProvider + DevTools
-├── Chat.tsx          # Main chat UI component
-├── Message.tsx       # Message display component
-├── trpc.ts           # tRPC client setup
-└── hooks/
-    └── useChat.ts    # Custom useChat hook
-```
-
 ## Server
 
 This example shares the server with `ai-sdk-trpc`. See [../ai-sdk-trpc/README.md](../ai-sdk-trpc/README.md) for server architecture and API reference.

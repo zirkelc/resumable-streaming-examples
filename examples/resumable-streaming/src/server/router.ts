@@ -1,13 +1,9 @@
 import {
   streamText,
-  JsonToSseTransformStream,
-  parseJsonEventStream,
-  uiMessageChunkSchema,
   UIMessageChunk,
 } from "ai";
 import { publicProcedure, router } from "./trpc";
-import { createStreamContext } from "../../../shared/stream-context";
-import { createAsyncIterableStream } from "ai-stream-utils/utils";
+import { createResumableContext } from "../../../shared/resumable-stream-context";
 import { createMockModel } from "../../../shared/mock-model";
 import chalk from "chalk";
 
@@ -20,7 +16,6 @@ export const appRouter = router({
   startStream: publicProcedure.mutation(async function* (): AsyncGenerator<UIMessageChunk> {
     console.log(chalk.magenta(`[server/start-stream]  Starting stream with ID=${STREAM_ID}`));
 
-    const streamContext = await createStreamContext();
     const model = createMockModel(MOCK_RESPONSE, {
       chunkDelayInMs: 500
     });
@@ -38,48 +33,24 @@ export const appRouter = router({
       }
     });
 
-    const uiStream = result.toUIMessageStream();
-    const [trpcStream, redisStream] = uiStream.tee();
+    const streamContext = await createResumableContext({ activeStreamId: STREAM_ID });
+    const uiStream = await streamContext.startStream(result.toUIMessageStream());
 
-    const sseStream = redisStream.pipeThrough(new JsonToSseTransformStream());
-
-    await streamContext.createNewResumableStream(STREAM_ID, () => sseStream);
-
-    yield* createAsyncIterableStream(trpcStream);
+    yield* uiStream;
   }),
 
   resumeStream: publicProcedure.mutation(async function* (): AsyncGenerator<UIMessageChunk> {
     console.log(chalk.cyan(`[server/resume-stream] Resuming stream with ID=${STREAM_ID}`));
 
-    const streamContext = await createStreamContext();
-    const resumedStream = await streamContext.resumeExistingStream(STREAM_ID);
+    const streamContext = await createResumableContext({ activeStreamId: STREAM_ID });
+    const resumedStream = await streamContext.resumeStream();
 
     if (!resumedStream) {
       console.log(chalk.cyan(`[server/resume-stream] No active stream found`));
       return;
     }
 
-    const chunkStream = parseJsonEventStream({
-      stream: resumedStream.pipeThrough(new TextEncoderStream()),
-      schema: uiMessageChunkSchema,
-    }).pipeThrough(
-      new TransformStream({
-        transform(result, controller) {
-          if (result.success) {
-            const chunk = result.value;
-            if (chunk.type === `text-delta`) {
-              console.log(chalk.cyan(`[server/resume-stream] UI chunk: ${chunk.delta}`));
-            }
-            controller.enqueue(chunk);
-          }
-        },
-        flush() {
-          console.log(chalk.cyan(`[server/resume-stream] Stream finished`));
-        }
-      }),
-    );
-
-    yield* createAsyncIterableStream(chunkStream);
+    yield* resumedStream;
   }),
 });
 

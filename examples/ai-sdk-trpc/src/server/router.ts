@@ -3,9 +3,6 @@ import {
   streamText,
   simulateReadableStream,
   type UIMessage,
-  JsonToSseTransformStream,
-  parseJsonEventStream,
-  uiMessageChunkSchema,
   UIMessageChunk,
   InferUIMessageChunk,
   InferUITools,
@@ -14,8 +11,7 @@ import { MockLanguageModelV3 } from "ai/test";
 import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
 import { generateId } from "../../../shared/utils";
 import { publicProcedure, router } from "./trpc";
-import { createStreamContext } from "../../../shared/stream-context";
-import { createAsyncIterableStream } from "ai-stream-utils/utils";
+import { createResumableContext } from "../../../shared/resumable-stream-context";
 
 type MyMetadata = {
   createdAt?: string;
@@ -111,8 +107,6 @@ export const appRouter = router({
       const activeStreamId = generateId(`stream`);
       saveChat({ ...chat, messages, activeStreamId });
 
-      const streamContext = await createStreamContext();
-
       console.log(`[sendMessage] Starting stream activeStreamId=${activeStreamId}`);
 
       const model = new MockLanguageModelV3({
@@ -137,18 +131,18 @@ export const appRouter = router({
         },
       });
 
-      const uiStream = result.toUIMessageStream({
+      const streamContext = await createResumableContext({ activeStreamId });
+      const uiStream = await streamContext.startStream(result.toUIMessageStream({
         originalMessages: messages,
         generateMessageId: () => generateId(`msg`),
         messageMetadata: ({ part }) => {
-          if (part.type === 'start') {
+          if (part.type === `start`) {
             return {
               createdAt: new Date().toISOString(),
             };
           }
 
-          // Send additional metadata when streaming completes
-          if (part.type === 'finish') {
+          if (part.type === `finish`) {
             return {
               finishReason: part.finishReason,
             };
@@ -158,14 +152,9 @@ export const appRouter = router({
           console.log(`[sendMessage] onFinish called`);
           saveChat({ ...chat, messages, activeStreamId: null });
         },
-      });
+      }));
 
-      const [trpcStream, redisStream] = uiStream.tee();
-      const sseStream = redisStream.pipeThrough(new JsonToSseTransformStream());
-
-      await streamContext.createNewResumableStream(activeStreamId, () => sseStream);
-
-      yield* createAsyncIterableStream(trpcStream);
+      yield* uiStream;
     }),
 
   resumeMessage: publicProcedure.input(z.object({ chatId: z.string() })).mutation(async function* ({
@@ -183,26 +172,11 @@ export const appRouter = router({
 
     console.log(`[resumeMessage] Resuming stream ${chat.activeStreamId}`);
 
-    const streamContext = await createStreamContext();
-    const resumedStream = await streamContext.resumeExistingStream(chat.activeStreamId);
+    const streamContext = await createResumableContext({ activeStreamId: chat.activeStreamId });
+    const resumedStream = await streamContext.resumeStream();
 
     if (resumedStream) {
-      const encodedStream = resumedStream.pipeThrough(new TextEncoderStream());
-
-      const chunkStream = parseJsonEventStream({
-        stream: encodedStream,
-        schema: uiMessageChunkSchema,
-      }).pipeThrough(
-        new TransformStream({
-          transform(result, controller) {
-            if (result.success) {
-              controller.enqueue(result.value);
-            }
-          },
-        }),
-      );
-
-      yield* createAsyncIterableStream(chunkStream);
+      yield* resumedStream;
     }
   }),
 });

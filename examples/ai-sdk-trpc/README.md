@@ -45,25 +45,6 @@ If the client disconnects, the Redis branch continues. When `resumeMessage` is c
 2. Parses SSE back to `UIMessageChunk` objects
 3. Yields remaining chunks to client
 
-## Project Structure
-
-```
-├── server/
-│   ├── index.ts          # HTTP server with CORS
-│   ├── router.ts         # tRPC router with streaming procedures
-│   ├── trpc.ts           # tRPC initialization
-│   ├── stream-context.ts # Resumable stream context (Redis)
-│   └── redis.ts          # Redis memory server setup
-├── client/
-│   ├── App.tsx           # QueryClientProvider + DevTools
-│   ├── Chat.tsx          # Main chat with useChat hook
-│   ├── Message.tsx       # Message display component
-│   ├── trpc.ts           # tRPC client setup
-│   ├── trpc-transport.ts # Custom ChatTransport for AI SDK
-│   └── main.tsx          # React entry point
-└── package.json
-```
-
 ## API Reference
 
 ### Queries
@@ -155,13 +136,9 @@ class TrpcChatTransport implements ChatTransport<UIMessage> {
 Streams are persisted using `resumable-stream` library with SSE format:
 
 ```ts
-const [trpcStream, redisStream] = uiStream.tee();
-
-/** Convert to SSE for storage */
-const sseStream = redisStream.pipeThrough(new JsonToSseTransformStream());
-
-/** Register with resumable-stream */
-streamContext.createNewResumableStream(activeStreamId, () => sseStream);
+const streamContext = await createResumableContext({ activeStreamId });
+const uiStream = await streamContext.startStream(result.toUIMessageStream({ ... }));
+yield* uiStream;
 ```
 
 ### Auto-Resume Detection

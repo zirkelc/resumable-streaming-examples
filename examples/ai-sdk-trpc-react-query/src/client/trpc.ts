@@ -1,7 +1,7 @@
 import { QueryClient } from "@tanstack/react-query";
 import { createTRPCClient, httpBatchStreamLink } from "@trpc/client";
 import { createTRPCOptionsProxy } from "@trpc/tanstack-react-query";
-import type { AppRouter } from "../../../ai-sdk-trpc/src/server/router";
+import type { AppRouter } from "../server/router";
 
 export const queryClient = new QueryClient();
 
@@ -18,4 +18,4 @@ export const trpc = createTRPCOptionsProxy<AppRouter>({
   queryClient,
 });
 
-export type { MyUIMessage } from "../../../ai-sdk-trpc/src/server/router";
+export type { MyUIMessage } from "../server/router";

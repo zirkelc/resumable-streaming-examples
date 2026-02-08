@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:server": "tsx watch ../ai-sdk-trpc/src/server/index.ts",
+    "dev:server": "tsx watch ./src/server/index.ts",
     "dev:client": "vite"
   }
 }

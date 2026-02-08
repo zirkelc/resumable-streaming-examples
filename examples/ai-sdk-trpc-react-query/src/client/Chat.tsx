@@ -7,7 +7,7 @@ export function Chat() {
   const [chatId, setChatId] = useState(() => getUrlParam(`chatId`) || setUrlParam(`chatId`, generateId(`chat`)));
   const [input, setInput] = useState(``);
 
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, status, stopStream } = useChat({
     chatId,
     autoResume: true,
     onError: (err) => {
@@ -25,6 +25,12 @@ export function Chat() {
     onFinish: (chunk) => {
       console.log(`[Chat] onFinish:`, chunk);
     },
+    onResume: () => {
+      console.log(`[Chat] onResume called`);
+    },
+    onStop: () => {
+      console.log(`[Chat] onStop called`);
+    },
   });
 
   const isSending = status === `streaming`;
@@ -35,13 +41,13 @@ export function Chat() {
     setChatId(newId);
   };
 
-  const handleSubmit = async (e: FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isSending) return;
 
     const message = input;
     setInput(``);
-    await sendMessage(message);
+    sendMessage(message);
   };
 
   if (status === `loading`) {
@@ -127,21 +133,38 @@ export function Chat() {
             border: `1px solid #ccc`,
           }}
         />
-        <button
-          type="submit"
-          disabled={!input.trim() || isSending}
-          style={{
-            padding: `8px 16px`,
-            borderRadius: `4px`,
-            border: `none`,
-            backgroundColor: `#007bff`,
-            color: `white`,
-            cursor: !input.trim() || isSending ? `not-allowed` : `pointer`,
-            opacity: !input.trim() || isSending ? 0.5 : 1,
-          }}
-        >
-          {isSending ? `Sending...` : `Send`}
-        </button>
+        {isSending ? (
+          <button
+            type="button"
+            onClick={stopStream}
+            style={{
+              padding: `8px 16px`,
+              borderRadius: `4px`,
+              border: `none`,
+              backgroundColor: `#dc3545`,
+              color: `white`,
+              cursor: `pointer`,
+            }}
+          >
+            Stop
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            style={{
+              padding: `8px 16px`,
+              borderRadius: `4px`,
+              border: `none`,
+              backgroundColor: `#007bff`,
+              color: `white`,
+              cursor: !input.trim() ? `not-allowed` : `pointer`,
+              opacity: !input.trim() ? 0.5 : 1,
+            }}
+          >
+            Send
+          </button>
+        )}
       </form>
     </div>
   );

@@ -13,7 +13,7 @@ AI SDK's `@ai-sdk/react` provides a `useChat` hook, but you may want more contro
 ## How It Works
 
 ```ts
-const { messages, sendMessage, resumeStream } = useChat({ chatId });
+const { messages, sendMessage, resumeStream, stopStream } = useChat({ chatId });
 ```
 
 ### sendMessage Flow
@@ -28,12 +28,11 @@ const { messages, sendMessage, resumeStream } = useChat({ chatId });
    - Calls `onData()` for data chunks
 5. `readUIMessageStream()` accumulates chunks into complete `UIMessage`
 6. `upsertMessage()` updates cache with each accumulated message (insert or replace by ID)
-7. On success: invalidate query to sync with server
 
 ### resumeStream Flow
 
 1. Call `onResume` callback
-2. Get last message from cache 
+2. Get last message from cache
 3. Call `trpcClient.resumeMessage.mutate()` → returns `AsyncIterable<UIMessageChunk>`
 4. Convert to `ReadableStream` with TransformStream interceptor:
    - Calls `onChunk()` for every chunk
@@ -42,7 +41,14 @@ const { messages, sendMessage, resumeStream } = useChat({ chatId });
    - Calls `onData()` for data chunks
 5. `readUIMessageStream()` from latest message
 6. `upsertMessage()` updates cache with each accumulated message (insert or replace by ID)
-7. On success: invalidate query to sync with server
+
+### stopStream Flow
+
+1. Call `onStop` callback
+2. Abort client-side stream consumption via `AbortController`
+3. Call `trpcClient.stopStream.mutate()` → publishes stop message via Redis pub/sub
+4. Server receives stop signal → aborts `streamText()` via `AbortController`
+5. Partial message remains in cache (no invalidation on abort)
 
 ## Callbacks
 
@@ -61,14 +67,35 @@ useChat({
     // Fires when streaming completes (type: "finish")
     // chunk.finishReason: "stop" | "length" | "error" | ...
   },
+  onStop: () => {
+    // Fires when stopStream() is called
+  },
   onError: (error) => {
-    // Fires on stream errors (not on intentional abort)
+    // Fires on stream errors
   },
   onResume: () => {
     // Fires when resumeStream() is called
   },
 });
 ```
+
+## Stop Streaming
+
+A running stream can be stopped by calling `stopStream()`:
+
+```ts
+const { stopStream, status } = useChat({ chatId });
+
+// Stop button in UI
+<button onClick={stopStream} disabled={status !== `streaming`}>
+  Stop
+</button>
+```
+
+When stopped:
+- Client-side stream consumption is aborted
+- Server receives stop signal via Redis pub/sub and aborts `streamText()`
+- Partial message remains visible in the UI
 
 ## Resume Streaming
 
@@ -90,7 +117,7 @@ The server handles stream state, that means if no active stream exists, the resu
 
 ## Server
 
-This example shares the server with `ai-sdk-trpc`. See [../ai-sdk-trpc/README.md](../ai-sdk-trpc/README.md) for server architecture and API reference.
+This example has its own tRPC server with endpoints for `sendMessage`, `resumeMessage`, `stopStream`, and `listMessages`. The server uses Redis pub/sub for cross-process stop signals via `createResumableContext`.
 
 ## Running the Example
 
@@ -119,6 +146,7 @@ pnpm dev:client
 | `onData` | `(chunk: DataChunk) => void` | Called for data chunks |
 | `onStart` | `(chunk) => void` | Called when streaming starts |
 | `onFinish` | `(chunk) => void` | Called when streaming completes |
+| `onStop` | `() => void` | Called when stop is triggered |
 | `onError` | `(error: Error) => void` | Called on stream errors |
 | `onResume` | `() => void` | Called when resume is triggered |
 
@@ -127,9 +155,10 @@ pnpm dev:client
 | Property | Type | Description |
 |----------|------|-------------|
 | `messages` | `MyUIMessage[]` | Array of chat messages from React Query cache |
-| `sendMessage` | `(input: string) => Promise<void>` | Send a new message |
+| `sendMessage` | `(input: string) => void` | Send a new message |
 | `status` | `UseChatStatus` | Current status: `ready`, `loading`, `streaming`, `error` |
 | `resumeStream` | `() => void` | Resume an interrupted stream |
+| `stopStream` | `() => void` | Stop the current stream |
 
 ## License
 

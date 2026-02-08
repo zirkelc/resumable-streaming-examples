@@ -5,6 +5,8 @@
   "scripts": {
     "dev:server": "tsx watch ./src/server/index.ts",
     "start-stream": "tsx ./src/cli/start-stream.ts",
-    "resume-stream": "tsx ./src/cli/resume-stream.ts"
+    "resume-stream": "tsx ./src/cli/resume-stream.ts",
+    "stop-stream": "tsx ./src/cli/stop-stream.ts",
+    "typecheck": "typecheck"
   }
 }

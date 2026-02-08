@@ -16,13 +16,21 @@ export const appRouter = router({
   startStream: publicProcedure.mutation(async function* (): AsyncGenerator<UIMessageChunk> {
     console.log(chalk.magenta(`[server/start-stream]  Starting stream with ID=${STREAM_ID}`));
 
+    const abortController = new AbortController();
+
+    const streamContext = await createResumableContext({
+      activeStreamId: STREAM_ID,
+      abortController,
+    });
+
     const model = createMockModel(MOCK_RESPONSE, {
-      chunkDelayInMs: 500
+      chunkDelayInMs: 500,
     });
 
     const result = streamText({
       model,
       prompt: `Simulated prompt`,
+      abortSignal: abortController.signal,
       onChunk: ({ chunk }) => {
         if (chunk.type === `text-delta`) {
           console.log(chalk.magenta(`[server/start-stream]  UI chunk: ${chunk.text}`));
@@ -30,10 +38,9 @@ export const appRouter = router({
       },
       onFinish: () => {
         console.log(chalk.magenta(`[server/start-stream]  Stream finished`));
-      }
+      },
     });
 
-    const streamContext = await createResumableContext({ activeStreamId: STREAM_ID });
     const uiStream = await streamContext.startStream(result.toUIMessageStream());
 
     yield* uiStream;
@@ -51,6 +58,16 @@ export const appRouter = router({
     }
 
     yield* resumedStream;
+  }),
+
+  stopStream: publicProcedure.mutation(async () => {
+    console.log(chalk.red(`[server/stop-stream] Stop requested for ID=${STREAM_ID}`));
+
+    const streamContext = await createResumableContext({ activeStreamId: STREAM_ID });
+    await streamContext.stopStream();
+
+    console.log(chalk.red(`[server/stop-stream] Stop published`));
+    return { success: true };
   }),
 });
 

@@ -26,14 +26,14 @@ export async function createResumableContext({ activeStreamId, abortController }
   /** Unsubscribe from stop channel */
   async function unsubscribe() {
     if (!abortController) return;
-    console.log(chalk.red(`[resumable-context] Unsubscribing from stop channel`));
+    // console.log(chalk.yellow(`[resumable-context] Unsubscribing from stop channel`));
     await subscriber.unsubscribe(stopChannel);
   }
 
   /** Set up stop subscription if abortController provided */
   if (abortController) {
     await subscriber.subscribe(stopChannel, () => {
-      console.log(chalk.red(`[resumable-context] Stop message received on channel=${stopChannel}`));
+      // console.log(chalk.yellow(`[resumable-context] Stop message received on channel=${stopChannel}`));
       abortController.abort();
     });
 
@@ -78,13 +78,13 @@ export async function createResumableContext({ activeStreamId, abortController }
           if (result.success) {
             const chunk = result.value;
             if (chunk.type === `text-delta`) {
-              console.log(chalk.cyan(`[server/resume-stream] UI chunk: ${chunk.delta}`));
+              // console.log(chalk.cyan(`[resumable-context/resume-stream] UI chunk: ${chunk.delta}`));
             }
             controller.enqueue(chunk);
           }
         },
         flush() {
-          console.log(chalk.cyan(`[server/resume-stream] Stream finished`));
+          // console.log(chalk.cyan(`[resumable-context/resume-stream] Stream finished`));
         }
       }),
     );
@@ -94,7 +94,7 @@ export async function createResumableContext({ activeStreamId, abortController }
 
   /** Publish a stop message to the Redis stop channel */
   async function stopStream(): Promise<void> {
-    console.log(chalk.red(`[resumable-context] Publishing stop to channel=${stopChannel}`));
+    // console.log(chalk.yellow(`[resumable-context/stop-stream] Publishing stop to channel=${stopChannel}`));
     await publisher.publish(stopChannel, `stop`);
   }
 

@@ -1,18 +1,11 @@
 import { z } from "zod";
-import {
-  streamText,
-  simulateReadableStream,
-  type UIMessage,
-  UIMessageChunk,
-  InferUIMessageChunk,
-  InferUITools,
-} from "ai";
-import { MockLanguageModelV3 } from "ai/test";
-import type { LanguageModelV3StreamPart } from "@ai-sdk/provider";
+import { streamText, type UIMessage, UIMessageChunk, InferUITools } from "ai";
+import chalk from "chalk";
 import { generateId } from "../../../shared/utils";
 import { publicProcedure, router } from "./trpc";
 import { createResumableContext } from "../../../shared/resumable-stream-context";
 import { createMockModel } from "../../../shared/mock-model";
+import { createAsyncIterableStream } from "ai-stream-utils/utils";
 
 type MyMetadata = {
   createdAt?: string;
@@ -66,7 +59,7 @@ export const appRouter = router({
     )
     .mutation(async function* ({ input }): AsyncGenerator<UIMessageChunk> {
       const { chatId, message } = input;
-      console.log(`[sendMessage] chatId=${chatId}, message=${message.id}`);
+      console.log(chalk.magenta(`[sendMessage] chatId=${chatId}, message=${message.id}`));
       const chat = getChat(chatId);
       const messages = chat.messages;
 
@@ -80,7 +73,7 @@ export const appRouter = router({
       const activeStreamId = generateId(`stream`);
       saveChat({ ...chat, messages, activeStreamId });
 
-      console.log(`[sendMessage] Starting stream activeStreamId=${activeStreamId}`);
+      console.log(chalk.magenta(`[sendMessage] Starting stream activeStreamId=${activeStreamId}`));
 
       const abortController = new AbortController();
 
@@ -99,13 +92,13 @@ export const appRouter = router({
         abortSignal: abortController.signal,
         onChunk: ({ chunk }) => {
           if (chunk.type === `text-delta`) {
-            console.log(`[sendMessage] onChunk ${chunk.type}: ${chunk.text}`);
+            console.log(chalk.magenta(`[sendMessage] onChunk ${chunk.type}: ${chunk.text}`));
           } else {
-            console.log(`[sendMessage] onChunk ${chunk.type}`);
+            console.log(chalk.magenta(`[sendMessage] onChunk ${chunk.type}`));
           }
         },
         onAbort: () => {
-          console.log(`[sendMessage] onAbort called`);
+          console.log(chalk.magenta(`[sendMessage] onAbort called`));
         }
       });
 
@@ -126,7 +119,7 @@ export const appRouter = router({
           }
         },
         onFinish: ({ messages, isAborted }) => {
-          console.log(`[sendMessage] onFinish called, isAborted=${isAborted}`, { messages});
+          console.log(chalk.magenta(`[sendMessage] onFinish called, isAborted=${isAborted}`));
           saveChat({ ...chat, messages, activeStreamId: null });
         },
       }));
@@ -138,39 +131,51 @@ export const appRouter = router({
     input,
   }): AsyncGenerator<UIMessageChunk> {
     const { chatId } = input;
-    console.log(`[resumeMessage] chatId=${chatId}`);
+    console.log(chalk.cyan(`[resumeMessage] chatId=${chatId}`));
 
     const chat = getChat(chatId);
 
     if (!chat.activeStreamId) {
-      console.log(`[resumeMessage] No active stream for chat ${chatId}`);
+      console.log(chalk.cyan(`[resumeMessage] No active stream for chat ${chatId}`));
       return;
     }
 
-    console.log(`[resumeMessage] Resuming stream ${chat.activeStreamId}`);
+    console.log(chalk.cyan(`[resumeMessage] Resuming stream ${chat.activeStreamId}`));
 
     const streamContext = await createResumableContext({ activeStreamId: chat.activeStreamId });
     const resumedStream = await streamContext.resumeStream();
 
-    if (resumedStream) {
-      yield* resumedStream;
+    if (!resumedStream) {
+      console.log(chalk.cyan(`[resumeMessage] No stream to resume for activeStreamId=${chat.activeStreamId}`));
+      return;
     }
-  }),
 
+    // yield* resumedStream;
+    yield* createAsyncIterableStream(resumedStream?.pipeThrough(new TransformStream({
+      transform(chunk, controller) {
+        if (chunk.type === `text-delta`) {
+          console.log(chalk.cyan(`[resumeMessage] onChunk ${chunk.type}: ${chunk.delta}`));
+        } else {
+          console.log(chalk.cyan(`[resumeMessage] onChunk ${chunk.type}`));
+        }
+        controller.enqueue(chunk);
+      }
+    })))
+  }),
   stopStream: publicProcedure
     .input(z.object({ chatId: z.string() }))
     .mutation(async ({ input }) => {
       const { chatId } = input;
-      console.log(`[stopStream] chatId=${chatId}`);
+      console.log(chalk.yellow(`[stopStream] chatId=${chatId}`));
 
       const chat = getChat(chatId);
 
       if (!chat.activeStreamId) {
-        console.log(`[stopStream] No active stream for chat ${chatId}`);
+        console.log(chalk.yellow(`[stopStream] No active stream for chat ${chatId}`));
         return { success: false };
       }
 
-      console.log(`[stopStream] Stopping stream ${chat.activeStreamId}`);
+      console.log(chalk.yellow(`[stopStream] Stopping stream ${chat.activeStreamId}`));
 
       const streamContext = await createResumableContext({ activeStreamId: chat.activeStreamId });
       await streamContext.stopStream();

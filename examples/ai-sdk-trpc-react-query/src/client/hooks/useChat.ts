@@ -67,7 +67,6 @@ export function useChat({
   onError,
   onResume,
 }: UseChatOptions): UseChatReturn {
-  const abortControllerRef = useRef<AbortController | null>(null);
   const hasAttemptedResumeRef = useRef(false);
   const queryClientHook = useQueryClient();
 
@@ -106,35 +105,24 @@ export function useChat({
     mutationFn: async (userMessage: MyUIMessage) => {
       console.log(`[useChat.sendMessage] Starting mutation for chatId=${chatId}`);
 
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
-
       /** Optimistically add user message to cache */
       upsertMessage(userMessage);
 
-      try {
-        const asyncIterable = await trpcClient.sendMessage.mutate(
-          { chatId, message: userMessage },
-          { signal },
-        );
+      const asyncIterable = await trpcClient.sendMessage.mutate({ chatId, message: userMessage });
 
-        const stream = convertToUIMessageStream(
-          // @ts-ignore
-          asyncIterable as AsyncIterable<MyUIChunk>,
-          {
-            onChunk,
-            onStart,
-            onFinish,
-          },
-        );
+      const stream = convertToUIMessageStream(
+        // @ts-ignore
+        asyncIterable as AsyncIterable<MyUIChunk>,
+        {
+          onChunk,
+          onStart,
+          onFinish,
+        },
+      );
 
-        for await (const uiMessage of readUIMessageStream<MyUIMessage>({ stream })) {
-          console.log(`[useChat.sendMessage] Received message update:`, uiMessage.id);
-          upsertMessage(uiMessage);
-        }
-
-      } finally {
-        abortControllerRef.current = null;
+      for await (const uiMessage of readUIMessageStream<MyUIMessage>({ stream })) {
+        console.log(`[useChat.sendMessage] Received message update:`, uiMessage.id);
+        upsertMessage(uiMessage);
       }
     },
     onError: (error) => {
@@ -152,31 +140,23 @@ export function useChat({
     mutationFn: async (lastMessage?: MyUIMessage) => {
       console.log(`[useChat.resumeMessage] Starting mutation for chatId=${chatId}`);
 
-      abortControllerRef.current = new AbortController();
-      const signal = abortControllerRef.current.signal;
+      const asyncIterable = await trpcClient.resumeMessage.mutate({ chatId });
 
-      try {
-        const asyncIterable = await trpcClient.resumeMessage.mutate({ chatId }, { signal });
+      const stream = convertToUIMessageStream(
+        asyncIterable as AsyncIterable<MyUIChunk>,
+        {
+          onChunk,
+          onStart,
+          onFinish,
+        },
+      );
 
-        const stream = convertToUIMessageStream(
-          asyncIterable as AsyncIterable<MyUIChunk>,
-          {
-            onChunk,
-            onStart,
-            onFinish,
-          },
-        );
-
-
-        for await (const uiMessage of readUIMessageStream<MyUIMessage>({
-          stream,
-          message: lastMessage,
-        })) {
-          console.log(`[useChat.resumeMessage] Received message update:`, uiMessage.id);
-          upsertMessage(uiMessage);
-        }
-      } finally {
-        abortControllerRef.current = null;
+      for await (const uiMessage of readUIMessageStream<MyUIMessage>({
+        stream,
+        message: lastMessage,
+      })) {
+        console.log(`[useChat.resumeMessage] Received message update:`, uiMessage.id);
+        upsertMessage(uiMessage);
       }
     },
     onError: (error) => {
@@ -193,7 +173,6 @@ export function useChat({
     mutationKey: trpc.stopStream.mutationKey(),
     mutationFn: async () => {
       console.log(`[useChat.stopStream] Stopping stream for chatId=${chatId}`);
-      abortControllerRef.current?.abort();
       await trpcClient.stopStream.mutate({ chatId });
     },
   });

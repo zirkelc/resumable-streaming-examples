@@ -1,5 +1,5 @@
 {
-  "name": "ai-sdk-trpc-cli",
+  "name": "resumable-stream-without-redis",
   "private": true,
   "type": "module",
   "scripts": {

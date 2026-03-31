@@ -26,6 +26,10 @@ export const appRouter = router({
   startStream: publicProcedure.mutation(async function* (): AsyncGenerator<UIMessageChunk> {
     console.log(chalk.magenta(`[server/start-stream] Starting stream`));
 
+    /** Clear existing chunks and messages */
+    await db.delete(chunks).where(eq(chunks.streamId, STREAM_ID));
+    await db.delete(messages).where(eq(messages.id, MESSAGE_ID));
+
     /** Insert message metadata row */
     await db.insert(messages).values({
       id: MESSAGE_ID,
@@ -41,13 +45,13 @@ export const appRouter = router({
         .where(and(eq(messages.id, MESSAGE_ID), isNotNull(messages.cancelledAt)));
 
       if (message) {
-        console.log(chalk.red(`[server/start-stream] Cancellation detected, aborting`));
+        console.log(chalk.yellow(`[server/start-stream] Cancellation detected, aborting`));
         abortController.abort();
       }
     }, CANCEL_INTERVAL_MS);
 
     const model = createMockModel(MOCK_RESPONSE, {
-      chunkDelayInMs: 500,
+      chunkDelayInMs: 1_000,
     });
 
     const result = streamText({

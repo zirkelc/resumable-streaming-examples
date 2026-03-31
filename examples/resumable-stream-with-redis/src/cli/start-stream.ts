@@ -8,7 +8,19 @@ function getTextFromMessage(message: UIMessage): string {
   return textPart && `text` in textPart ? textPart.text : ``;
 }
 
+async function waitForKeypress() {
+  process.stdin.setRawMode(true);
+  return new Promise<void>((resolve) => {
+    process.stdin.once(`data`, () => {
+      process.stdin.setRawMode(false);
+      resolve();
+    });
+  });
+}
+
 async function main() {
+  console.log(chalk.magenta(`[start-stream] Press any key to start...`));
+  await waitForKeypress();
   console.log(chalk.magenta(`[start-stream] Starting stream`));
 
   const asyncIterable = await trpcClient.startStream.mutate();

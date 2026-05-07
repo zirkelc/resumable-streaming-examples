@@ -1,4 +1,4 @@
-# tRPC Streaming Examples
+# Resumable Streaming Examples
 
 A collection of examples demonstrating **streaming** and **resumable streaming** patterns with tRPC, TanStack Query and AI SDK.
 

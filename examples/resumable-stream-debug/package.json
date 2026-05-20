@@ -1,0 +1,11 @@
+{
+  "name": "resumable-stream-debug",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev:server": "tsx ./src/server/index.ts",
+    "dev:server:watch": "tsx watch ./src/server/index.ts",
+    "dev:client": "tsx ./src/cli/index.tsx",
+    "typecheck": "typecheck"
+  }
+}

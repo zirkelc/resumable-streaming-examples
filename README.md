@@ -26,6 +26,10 @@ This example demonstrates resumable streaming with multiple CLI clients using Re
 
 Same resumable streaming pattern as above, but replaces Redis with an in-memory SQLite database (Drizzle ORM). Chunks are flushed to SQLite in throttled batches, resume clients replay stored chunks then poll for new ones, and cancellation is detected via a `cancelled_at` field in the database.
 
+### [Resumable Streaming Debug](./examples/resumable-stream-debug/)
+
+Same resumable streaming pattern as [Resumable Streaming with Redis](./examples/resumable-stream-with-redis/), but the resumable streaming protocol is implemented inline against Redis pub/sub instead of using the `resumable-stream` library. Useful as a reference for understanding how the algorithm works end-to-end, and ships with an interactive TUI for stepping through producer/resumer flows under a debugger.
+
 ## License
 
 MIT
